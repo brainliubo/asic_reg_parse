@@ -2,7 +2,7 @@ import xlrd
 import xlwt
 from dp_cc_reg_class import dp_cc_regs_class
 import struct
-import  os
+import os
 
 '''
 process_origin_excel: 处理原始的excel,主要是merge_cell,将Merge_cell的值填充到各个cell,输出到新的excel中
@@ -55,7 +55,8 @@ def process_filled_excel(filled_excel):
     reg_content_list = []
     for row_num in range(sheet.nrows):
         row_content = sheet.row_values(row_num,0,sheet.ncols)
-        temp_reg_class = dp_cc_regs_class((row_content[0]),
+        temp_reg_class = dp_cc_regs_class(row_num,
+                                                 row_content[0],
                                                   row_content[1],
                                                   row_content[2],
                                                   row_content[3],
@@ -96,25 +97,39 @@ def read_datafile(data_path,data_endding,single_data_size):
     return  address_data_dict
 
 '''
+filed_bit_vastart_bit,end_bit 进行filedyu进行field的解析
+'''
+def filed_bit_value(start_bit,end_bit,data,data_length):
+    bit_length = int(end_bit) - int(start_bit) + 1
+    bit_and_value =  0
+    for i in range(bit_length):
+        bit_and_value = bit_and_value + (1 << i)
+    print(hex(bit_and_value))
+    if data < 0:  #负数补码
+        data = pow(2,data_length ) + data
+
+    temp_data = (data >> int(start_bit))
+    field_data = temp_data & bit_and_value  #bit filed
+    #return  hex(field_data).replace("0x","") #16进制存储
+    return hex(field_data)
+
+
+'''
 reg_field_parse: 根据reg_filed,以及data,进行位段的解析，结果存储在list中
 '''
 def reg_field_parse(reg_class,data):
     bit = reg_class.bit
     bit = bit.lstrip("[")
     bit_list = bit.rstrip("]").split(":")
-    print(type(bit_list))
-    print(bit_list)
     if (len(bit_list) == 1):
         start_field = end_field = bit_list[0]
     else :
         end_field = bit_list[0]
         start_field = bit_list[1]
-    print(start_field, end_field)
-
-    #解析位段
-
-    pass
-
+    print(data,start_field,end_field)
+    # 解析位段
+    reg_class.parse_field_value = filed_bit_value(start_field, end_field,data,32)
+    print(reg_class.parse_field_value)
 
 '''
 reg_parse: 根据reg_filed,以及data,进行所有的reg
@@ -128,6 +143,22 @@ def reg_parse(reg_content_row_list,data_dict):
             #print(data)
             #解析数据filed:
             reg_field_parse(row_class,data)
+
+'''
+reg_parse_result_output: 输出每个field中的结果到指定excel中
+'''
+def reg_parse_result_output(output_excel,reg_class_list):
+    write_workbook = xlwt.Workbook()
+    write_sheet = write_workbook.add_sheet("sheet1", cell_overwrite_ok=True)
+    for reg_class in reg_class_list:
+        col_index = 0
+
+        for key_value in reg_class.__dict__:
+            write_sheet.write(reg_class.excel_row_index,col_index,reg_class.__dict__[key_value])
+            col_index = col_index +1
+
+
+    write_workbook.save(output_excel)
 
 
 
@@ -147,5 +178,5 @@ if __name__ == "__main__":
     # 解析数据
     reg_parse(reg_filed_content_list,data_file_dict)
     #输出到excel中
-
+    reg_parse_result_output("dp_cc_reg_parse_result.xls",reg_filed_content_list)
     pass
